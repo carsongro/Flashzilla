@@ -17,7 +17,7 @@ extension View {
 struct ContentView: View {
     @Environment(\.accessibilityDifferentiateWithoutColor) var differentiateWithoutColor
     @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
-    @State private var cards = [Card]()
+    @StateObject var cardCollection = CardCollection()
     
     @State private var timeRemaining = 100
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -46,20 +46,20 @@ struct ContentView: View {
                     .clipShape(Capsule())
                 
                 ZStack {
-                    ForEach(0..<cards.count, id: \.self) { index in
-                        CardView(card: cards[index]) { correct in
+                    ForEach(0..<cardCollection.cards.count, id: \.self) { index in
+                        CardView(card: cardCollection.cards[index]) { correct in
                             withAnimation {
                                 removeCard(at: index, correct: correct)
                             }
                         }
-                        .stacked(at: index, in: cards.count)
-                        .allowsHitTesting(index == cards.count - 1)
-                        .accessibilityHidden(index < cards.count - 1)
+                        .stacked(at: index, in: cardCollection.cards.count)
+                        .allowsHitTesting(index == cardCollection.cards.count - 1)
+                        .accessibilityHidden(index < cardCollection.cards.count - 1)
                     }
                 }
                 .allowsHitTesting(timeRemaining > 0 && animationFinished)
                 
-                if cards.isEmpty && animationFinished {
+                if cardCollection.cards.isEmpty && animationFinished {
                     Button("Start Again", action: resetCards)
                         .padding()
                         .background(.white)
@@ -94,7 +94,7 @@ struct ContentView: View {
                     HStack {
                         Button {
                             withAnimation {
-                                removeCard(at: cards.count - 1, correct: false)
+                                removeCard(at: cardCollection.cards.count - 1, correct: false)
                             }
                         } label: {
                             Image(systemName: "xmark.circle")
@@ -108,7 +108,7 @@ struct ContentView: View {
                         Spacer()
                         Button {
                             withAnimation {
-                                removeCard(at: cards.count - 1, correct: true)
+                                removeCard(at: cardCollection.cards.count - 1, correct: true)
                             }
                         } label: {
                             Image(systemName: "checkmark.circle")
@@ -133,53 +133,39 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                if cards.isEmpty == false {
+                if cardCollection.cards.isEmpty == false {
                     isActive = true
                 }
             } else {
                 isActive = false
             }
         }
-        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards, content: EditCards.init)
-        .onAppear(perform: resetCards)
-    }
-    
-    func loadData() {
-//        if let data = UserDefaults.standard.data(forKey: "Cards") {
-//            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
-//                cards = decoded
-//            }
-//        }
-        
-        do {
-            let data = try Data(contentsOf: savePath)
-            cards = try JSONDecoder().decode([Card].self, from: data)
-        } catch {
-            cards = []
+        .sheet(isPresented: $showingEditScreen, onDismiss: resetCards) {
+            EditCards().environmentObject(cardCollection)
         }
-        
+        .onAppear(perform: resetCards)
     }
     
     func removeCard(at index: Int, correct: Bool) {
         guard index >= 0 else { return }
         
-        let card = cards.remove(at: index)
+        let card = cardCollection.cards.remove(at: index)
         
         if !correct {
             animationFinished = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                cards.insert(card, at: 0)
+                cardCollection.cards.insert(card, at: 0)
                 animationFinished = true
             }
         }
         
-        if cards.isEmpty {
+        if cardCollection.cards.isEmpty {
             isActive = false
         }
     }
     
     func resetCards() {
-        loadData()
+        cardCollection.loadData()
         timeRemaining = 100
         isActive = true
     }
