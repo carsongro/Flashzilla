@@ -9,7 +9,7 @@ import SwiftUI
 
 struct CardView: View {
     let card: Card
-    var removal: (() -> Void)? = nil
+    var removal: ((_ correct: Bool) -> Void)? = nil
     
     @State private var feedback = UINotificationFeedbackGenerator()
     
@@ -17,6 +17,7 @@ struct CardView: View {
     @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
     @State private var isShowingAnswer = false
     @State private var offset = CGSize.zero
+    @State private var falseOffset: CGFloat = 0
     
     var body: some View {
         ZStack {
@@ -29,10 +30,9 @@ struct CardView: View {
                 .background(
                         differentiateWithoutColor
                         ? nil
-                        : RoundedRectangle(cornerRadius: 25, style: .continuous).fill(offset.width > 0 ? .green : .red)
+                        : RoundedRectangle(cornerRadius: 25, style: .continuous).fill(falseOffset > 0 ? .green : .red)
                 )
                 .shadow(radius: 10)
-            
             VStack {
                 if voiceOverEnabled {
                     Text(isShowingAnswer ? card.answer : card.prompt)
@@ -62,6 +62,7 @@ struct CardView: View {
             DragGesture()
                 .onChanged { gesture in
                     offset = gesture.translation
+                    falseOffset = offset.width
                     feedback.prepare()
                 }
                 .onEnded { _ in
@@ -69,7 +70,7 @@ struct CardView: View {
                         if offset.width < 0 {
                             feedback.notificationOccurred(.error)
                         }
-                        removal?()
+                        removal?(offset.width > 0)
                     } else {
                         offset = .zero
                     }
